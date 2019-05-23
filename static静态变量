@@ -1,0 +1,206 @@
+  原文地址：http://www.cnblogs.com/52php/p/5658168.html
+  
+  在看别人项目过程中，看到函数里面很多static修饰的变量，关于static修饰的变量，作用域，用法越看越困惑，所以查了下资料。
+
+static用法如下：
+
+1.static 放在函数内部修饰变量
+
+2.static放在类里修饰属性，或方法
+
+3.static放在类的方法里修饰变量
+
+4.static修饰在全局作用域的变量
+
+所表示的不同含义如下：
+
+1.在函数执行完后，变量值仍然保存
+
+如下所示：
+
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+<?php
+function testStatic() {
+    static $val = 1;
+    echo $val;
+    $val++;
+}
+testStatic();   //output 1
+testStatic();   //output 2
+testStatic();   //output 3
+?>
+2.修饰属性或方法，可以通过类名访问，如果是修饰的是类的属性，保留值
+
+如下所示：
+
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+<?php
+class Person {
+    static $id = 0;
+ 
+    function __construct() {
+        self::$id++;
+    }
+ 
+    static function getId() {
+        return self::$id;
+    }
+}
+echo Person::$id;   //output 0
+echo "<br/>";
+ 
+$p1=new Person();
+$p2=new Person();
+$p3=new Person();
+ 
+echo Person::$id;   //output 3
+?>
+3.修饰类的方法里面的变量
+
+如下所示：
+
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+<?php
+class Person {
+    static function tellAge() {
+        static $age = 0;
+        $age++;
+        echo "The age is: $age
+";
+    }
+}
+echo Person::tellAge(); //output 'The age is: 1'
+echo Person::tellAge(); //output 'The age is: 2'
+echo Person::tellAge(); //output 'The age is: 3'
+echo Person::tellAge(); //output 'The age is: 4'
+?>
+4.修饰全局作用域的变量，没有实际意义（存在着作用域的问题，详情查看）
+
+如下所示：
+
+1
+2
+3
+4
+5
+<?php
+static $name = 1;
+$name++;
+echo $name;
+?>
+另外：考虑到PHP变量作用域
+
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+<?php
+include 'ChromePhp.php';
+ 
+$age=0;
+$age++;
+ 
+function test1() {
+    static $age = 100;
+    $age++;
+    ChromePhp::log($age);  //output 101
+}
+ 
+function test2() {
+    static $age = 1000;
+    $age++;
+    ChromePhp::log($age); //output 1001
+}
+ 
+test1();
+test2();
+ChromePhp::log($age); //outpuut 1
+?>
+可以看出：这3个变量是不相互影响的，另外，PHP里面只有全局作用域和函数作用域，没有块作用域
+
+如下所示：
+
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+<?php
+include 'ChromePhp.php';
+ 
+$age = 0;
+$age++;
+ 
+for ($i=0; $i<10; $i++) {
+    $age++;
+}
+ChromePhp::log($i);   //output 10;
+ChromePhp::log($age); //output 11;
+?>
