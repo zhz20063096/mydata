@@ -1,0 +1,173 @@
+原文地址：http://www.cnblogs.com/mangguoxiansheng/p/5967745.html
+
+一、用户对动态PHP网页访问过程
+
+用户浏览器发起对网页的访问：http://192.168.1.103/index.php
+
+用户和nginx服务器进行三次握手进行TCP连接（忽略包括nginx访问控制策略、nginx防火墙等访问控制策略）
+
+第一步：用户将http请求发送给nginx服务器
+
+第二步：nginx会根据用户访问的URI和后缀对请求进行判断
+
+1.例如用户访问的index.php，nginx则会根据配置文件中的location进行匹配，例如：
+
+复制代码
+root@json:/data/web# cat /etc/nginx/conf.d/blog.conf 
+server {
+    root /data/web/blog/;
+    index index.html index.htm;
+    server_name www.fwait.com;
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+    location /blog/ {
+        #alias /usr/share/doc/;
+        auth_basic "authorized users only";
+        auth_basic_user_file /etc/nginx/passwd.conf;
+        #autoindex on;
+        allow 192.168.1.103;
+        deny all;
+    }
+    location ~ \.php$ {
+        include /etc/nginx/fastcgi_params;
+        fastcgi_intercept_errors on;
+        fastcgi_pass 127.0.0.1:9000;
+    }
+
+}
+复制代码
+用户访问的是index.php，则会匹配到location ～ \.php$，这个的含义是对用户通过URI访问的资源进行区分大小的匹配，并且访问的资源是以.php结尾的。
+
+nginx根据用户请求的资源匹配到具体的location后，会执行location对应的动作，location中动作的含义是：
+
+include /etc/nginx/fastcgi_params; #表示nginx会调用fastcgi这个接口
+
+fastcgi_intercept_errors on; #表示开启fastcgi的中断和错误信息记录
+
+fastcgi_pass 127.0.0.1:9000; # 表示nginx通过fastcgi_pass将用户请求的资源发给127.0.0.1:9000进行解析，这里的nginx和php脚本解析服务器是在同一台机器上，所以127.0.0.1:9000表示的就是本地的php脚本解析服务器。
+
+根据nginx服务器的配置，可以看出，用户访问的是动态的php资源，nginx会调用php相关脚本解析程序对用户访问的资源进行解析。
+
+第三步：通过第二步可以看出，用户请求的是动态内容，nginx会将请求交给fastcgi客户端，通过fastcgi_pass将用户的请求发送给php-fpm
+
+如果用户访问的是静态资源呢，那就简单了，nginx直接将用户请求的静态资源返回给用户。
+
+第四步：fastcgi_pass将动态资源交给php-fpm后，php-fpm会将资源转给php脚本解析服务器的wrapper
+
+
+
+ 
+
+
+
+ 
+
+第五步：wrapper收到php-fpm转过来的请求后，wrapper会生成一个新的线程调用php动态程序解析服务器
+
+如果用户请求的是需要读取例如MySQL数据库等，将会触发读库操作;
+
+如果用户请求的是如图片/附件等，PHP会触发一次查询后端存储服务器如通过NFS进行存储的存储集群;
+
+第六步：php会将查询到的结果返回给nginx
+
+第七步：nginx构造一个响应报文将结果返回给用户
+
+这只是nginx的其中一种，用户请求的和返回用户请求结果是异步进行，即为用户请求的资源在nginx中做了一次中转，nginx可以同步，即为解析出来的资源，服务器直接将资源返回给用户，不用在nginx中做一次中转。
+
+二、相关疑问
+
+1.是不是每次用户对动态资源的请求都需要触发一次完整的动态资源解析过程？
+
+不是，可以有两种方法解决这个问题：
+
+第一，启用nginx本身具备的缓存功能，将动态资源解析结果缓存起来，下次用户进行对应资源访问时，nginx进行本次缓存查询，如果查询成功，则直接动态资源被解析后的静态资源返回给用户;
+
+第二，在nginx后端部署缓存机器，如部署varnish缓存集群，对资源进行缓存，用户请求的资源，可以先在缓存集群上进行查找;
+
+2.用nginx做缓存是否可行？看实际情况，如果在整个web架构中，nginx不是瓶颈的前提下，nginx可以用来做缓存，但是不建议这么做，因为nginx是用户请求和应答用户请求的必经之路，如果nginx出现了瓶颈，后端的其他如存储集群等性能再好也没用，所以在实际的部署中，不建议启用nginx的缓存功能（在将nginx作为http server的情况下）。因为启用nginx缓存功能，一是会降低nginx性能，二是会消耗部署nginx的对应服务器的硬件资源。
+
+3.如果用一张图表示nginx fastcgi wrapper php之间的关系
+
+
+
+4.fastcgi具体是个什么东西
+
+CGI全称通用网关接口 Commmon Gateway Interface
+
+用于HTTP服务上的程序服务通信交流的一种工具，CGI程序须运行在网络服务器上。
+
+传统CGI接口方式性能较差，由于每次HTTP服务器遇到动态程序需要重启解析器来执行解析，然后结果被返回给HTTP服务器。这在处理高并发时，几乎是不可能的，因此诞生了FastCGI。另外传统的CGI接口方式安全性也很差
+
+一个可伸缩地。高速地在HTTP服务器和动态脚本语言间通信的接口
+
+接口在linux下是socket（这个socket可以是文件socket也可以是ip socket）
+
+主要优点把动态语言和HTTP服务器分离开来。多数流行的HTTP服务器都支持FsatCGI包括Apache/Nginx/lighttpd等
+
+支持语言比较流行的是PHP，接口方式采用C/S架构，可以将HTTP服务器和脚本解析器分开，同时在脚本解析服务器上启动一个或者多个脚本解析守护进程。
+
+当HTTP服务器每次遇到动态程序时，可以将其直接交付给FastCGI进程来执行，然后将得到的结果返回给浏览器。这种方式可以让HTTP服务器专一地处理静态请求或者将动态脚本服务器的结果返回给客户端，这在很大程度上提高了整个应用系统的性能。
+
+5.具体的nginx + php的nginx相关配置
+
+ 
+
+复制代码
+root@json:/data/web# cat /etc/nginx/nginx.conf|egrep -v "#|^$"
+user www-data;
+worker_processes 4;
+pid /var/run/nginx.pid;
+events {
+    worker_connections 768;
+}
+http {
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+    access_log /var/log/nginx/access.log;
+    error_log /var/log/nginx/error.log;
+    gzip on;
+    gzip_disable "msie6";
+    
+    include /etc/nginx/conf.d/*.conf;
+    include /etc/nginx/sites-enabled/*;
+}
+root@json:/data/web#
+复制代码
+ 
+
+复制代码
+root@json:/data/web# cat /etc/nginx/conf.d/blog.conf
+server {
+    root /data/web/blog/;
+    index index.html index.htm;
+    server_name www.fwait.com;
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+    location /blog/ {
+        #alias /usr/share/doc/;
+        auth_basic "authorized users only";
+        auth_basic_user_file /etc/nginx/passwd.conf;
+        #autoindex on;
+        allow 192.168.1.103;
+        deny all;
+    }
+    location ~ \.php$ {
+        #include /usr/local/etc/nginx/fastcgi.conf;
+        include /etc/nginx/fastcgi_params;
+        fastcgi_intercept_errors on;
+        fastcgi_pass 127.0.0.1:9000;
+    }
+
+}
+root@json:/data/web# 
+复制代码
+ 参考链接：
+
+http://runningyongboy.blog.51cto.com/8234857/1722299
