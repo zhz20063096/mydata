@@ -1,0 +1,138 @@
+原文地址：https://www.cnblogs.com/wajika/p/6395603.html?utm_source=itdadao&utm_medium=referral
+
+Nginx FastCGI的运行原理
+一、FastCGI
+1.介绍
+CGI全称通用网关接口 Commmon Gateway Interface
+
+用于HTTP服务上的程序服务通信交流的一种工具，CGI程序须运行在网络服务器上。
+
+传统CGI接口方式性能较差，由于每次HTTP服务器遇到动态程序需要重启解析器来执行解析，然后结果被返回给HTTP服务器。这在处理高并发时，几乎是不可能的，因此诞生了FastCGI。另外传统的CGI接口方式安全性也很差
+
+一个可伸缩地。高速地在HTTP服务器和动态脚本语言间通信的接口
+
+接口在linux下是socket（这个socket可以是文件socket也可以是ip socket）
+
+主要优点把动态语言和HTTP服务器分离开来。多数流行的HTTP服务器都支持FsatCGI包括Apache/Nginx/lighttpd等
+
+支持语言比较流行的是PHP，接口方式采用C/S架构，可以将HTTP服务器和脚本解析器分开，同时在脚本解析服务器上启动一个或者多个脚本解析守护进程。
+
+当HTTP服务器每次遇到动态程序时，可以将其直接交付给FastCGI进程来执行，然后将得到的结果返回给浏览器。这种方式可以让HTTP服务器专一地处理静态请求或者将动态脚本服务器的结果返回给客户端，这在很大程度上提高了整个应用系统的性能。
+
+2. 配置文件注释
+vim /application/nginx/conf/fastcgi.conf
+fastcgi_param  SCRIPT_FILENAME    $document_root$fastcgi_script_name;#脚本文件请求的路径
+
+fastcgi_param  QUERY_STRING       $query_string; #请求的参数;如?app=123
+
+fastcgi_param  REQUEST_METHOD     $request_method; #请求的动作(GET,POST)
+
+fastcgi_param  CONTENT_TYPE       $content_type; #请求头中的Content-Type字段
+
+fastcgi_param  CONTENT_LENGTH     $content_length; #请求头中的Content-length字段。
+
+ 
+
+fastcgi_param  SCRIPT_NAME        $fastcgi_script_name; #脚本名称
+
+fastcgi_param  REQUEST_URI        $request_uri; #请求的地址不带参数
+
+fastcgi_param  DOCUMENT_URI       $document_uri; #与$uri相同。
+
+fastcgi_param  DOCUMENT_ROOT      $document_root; #网站的根目录。在server配置中root指令中指定的值
+
+fastcgi_param  SERVER_PROTOCOL    $server_protocol; #请求使用的协议，通常是HTTP/1.0或HTTP/1.1。 
+
+ 
+
+fastcgi_param  GATEWAY_INTERFACE  CGI/1.1;#cgi 版本
+
+fastcgi_param  SERVER_SOFTWARE    nginx/$nginx_version;#nginx 版本号，可修改、隐藏
+
+ 
+
+fastcgi_param  REMOTE_ADDR        $remote_addr; #客户端IP
+
+fastcgi_param  REMOTE_PORT        $remote_port; #客户端端口
+
+fastcgi_param  SERVER_ADDR        $server_addr; #服务器IP地址
+
+fastcgi_param  SERVER_PORT        $server_port; #服务器端口
+
+fastcgi_param  SERVER_NAME        $server_name; #服务器名，域名在server配置中指定的server_name
+
+ 
+
+#fastcgi_param  PATH_INFO           $path_info;#可自定义变量
+
+ 
+
+# PHP only, required if PHP was builtwith --enable-force-cgi-redirect
+
+#fastcgi_param  REDIRECT_STATUS    200;
+
+ 
+
+在php可打印出上面的服务环境变量
+
+如：echo$_SERVER['REMOTE_ADDR']
+
+ 
+
+3.FastCGI的重要特点总结：
+1）是HTTP服务器和动态脚本语言间通信的接口或者工具！
+
+2）优点就是把动态语言解析和HTTP服务器分离了开来！
+
+3）Nginx、Apache、lighttpd以及多数动态语言都支持FastCGI。
+
+4)接口方式采用C/S结构，分为HTTP服务器（客户端）和动态语言解析服务器（服务端）
+
+5）PHP动态语言服务端可以启动多个FastCGI的守护进程例如：php-fpm(fcgi process mangemnt))
+
+6)http服务器通过例（Nginx fastgi_pass)FastCGI客户端和动态语言FastCGI服务端通信（例如：php-fpm）
+
+ 
+
+ 
+
+二、Nginx FastCGI的运行原理
+
+
+      Nginx 不支持对外部动态程序的直接调用或者解析 ，所有的外部程序（包括PHP）必须通过FastCGI接口来调用。FastCGI接口在linux下是socket，（这个socket可以是文件socket，也可以是IP  socket）。为了调用CGI程序，还需要wrapper绑定在某个固定socket上，如端口或者文件socket。当Nginx将CGI请求发送给这个socket的时候，通过FastCGI接口，warpper接収到请求，然后派出一个新的线程，这个线程调用解释器或者外部程序处理脚本并读取返回数据，接着，wrapper再将返回的数据通过FastCGI接口，沿着固定socket传递给Nginx；最后，nginx将返回的数据发送给客户端，这就是Nginx+fastcgi的整个运行过程。
+
+     
+
+nginx fastcgi访问php
+
+1、用户发送http请求报文给nginx服务器
+
+2、nginx会根据文件url和后缀来判断请求
+
+3、如果请求的是静态内容,nginx会将结果直接返回给用户
+
+4、如果请求的是动态内容,nginx会将请求交给fastcgi客户端,通过fastcgi_pass将这个请求发送给php-fpm 
+
+5、php-fpm会将请求交给wrapper
+
+6、wrapper收到请求会生成新的线程调用php动态程序解析服务器
+
+7、如果用户请求的是博文、或者内容、PHP会请求MySQL查询结果
+
+8、如果用户请求的是图片、附件、PHP会请求nfs存储查询结果
+
+9、php会将查询到的结果交给Nginx
+
+10、nginx会生成一个响应报文返还给用户
+
+ 
+
+知识补充：
+
+网络上的两个程序通过一个双向的通信连接实现数据的交换，这个连接的一端称为一个socket。
+
+Socket的英文原义是“孔”或“插座”。作为BSDUNIX的进程通信机制，取后一种意思。通常也称作"套接字"，用于描述IP地址和端口，是一个通信链的句柄，可以用来实现不同虚拟机或不同计算机之间的通信。在Internet上的主机一般运行了多个服务软件，同时提供几种服务。每种服务都打开一个Socket，并绑定到一个端口上，不同的端口对应于不同的服务。Socket正如其英文原意那样，像一个多孔插座。一台主机犹如布满各种插座的房间，每个插座有一个编号，有的插座提供220伏交流电，有的提供110伏交流电，有的则提供有线电视节目。客户软件将插头插到不同编号的插座，就可以得到不同的服务。
+
+ 
+
+本文出自 “追梦IT男” 博客，请务必保留此出处http://runningyongboy.blog.51cto.com/8234857/1722299
