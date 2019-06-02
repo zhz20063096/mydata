@@ -7,6 +7,9 @@ uniq -c 中的-c 代表在每列旁边显示该行重复出现的次数
 sort 的 -n：依照数值的大小排序；-r 按照相反顺序排列
 > 将结果输出到文件中
 
+访问次数最多的ip
+awk '{a[$1] += 1;} END {for (i in a) printf("%d %s\n", a[i], i);}' 日志文件 | sort -n | tail -n 10 #用tail显示最后10行
+
 当前WEB服务器中联接次数最多的ip地址
 netstat -ntu |awk '{print $5}' |sort | uniq -c| sort -nr
 
