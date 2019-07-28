@@ -1,0 +1,348 @@
+原文地址：https://blog.csdn.net/varyall/article/details/81510915
+
+
+最近看到redis4支持内存碎片清理了, 之前一直期待有这么一个功能, 因为之前遇到内存碎片的解决办法就是重启, 现在终于有了优雅的解决方案.\^o^/, 这个功能其实oranagra 在2017年1月1日已经提交pr了, 相关地址: https://github.com/antirez/redis/pull/3720
+
+版本说明:
+
+ Redis 4.0-RC3 以上版本才支持的
+需要使用jemalloc作为内存分配器(默认的)
+功能介绍:
+
+支持在运行期进行自动内存碎片清理 (config set activedefrag yes)
+支持通过命令 memory purge 进行清理(与自动清理区域不同)
+功能验证流程:
+
+(1) 首先需要拉取4.0-RC3之后的版本代码, 编译
+
+(2) 启动时限定内存大小为1g并启动lru, 命令如下:
+
+./src/redis-server --maxmemory 1gb --maxmemory-policy allkeys-lru --activedefrag no --port 6383
+(3) 构造大量数据并导致lru, 这样可以触发内存碎片, 命令如下:
+
+redis-cli -p 6383 debug populate 7000000 asdf 150
+(4) 查看当前的内存使用情况, 会发现有200多万的数据被清理掉了
+
+$ redis-cli -p 6383 info keyspace
+# Keyspace
+db0:keys=4649543,expires=0,avg_ttl=0
+(5) 查看当前的内存碎片率, 这时碎片率(mem_fragmentation_ratio)很高 : 1.54, 意味着54%的内存浪费
+
+$ redis-cli -p 6383 info memory
+# Memory
+used_memory:1073741736
+used_memory_human:1024.00M
+used_memory_rss:1650737152
+used_memory_rss_human:1.54G
+used_memory_peak:1608721680
+used_memory_peak_human:1.50G
+used_memory_peak_perc:66.75%
+used_memory_overhead:253906398
+used_memory_startup:766152
+used_memory_dataset:819835338
+used_memory_dataset_perc:76.41%
+total_system_memory:67535904768
+total_system_memory_human:62.90G
+used_memory_lua:37888
+used_memory_lua_human:37.00K
+maxmemory:1073741824
+maxmemory_human:1.00G
+maxmemory_policy:allkeys-lru
+mem_fragmentation_ratio:1.54
+mem_allocator:jemalloc-4.0.3
+active_defrag_running:0
+lazyfree_pending_objects:0
+(6) 看看内存分配的详细情况, 这个地方看不懂可以看看: 科普文, 关键的是util指标, 指的是内存利用率, 最大的bins内存util是0.661, 说明内存利用率不高
+
+$ echo "`redis-cli -p 6383 memory malloc-stats`"
+___ Begin jemalloc statistics ___
+Version: 4.0.3-0-ge9192eacf8935e29fc62fddc2701f7942b1cc02c
+Assertions disabled
+Run-time option settings:
+  opt.abort: false
+  opt.lg_chunk: 21
+  opt.dss: "secondary"
+  opt.narenas: 48
+  opt.lg_dirty_mult: 3 (arenas.lg_dirty_mult: 3)
+  opt.stats_print: false
+  opt.junk: "false"
+  opt.quarantine: 0
+  opt.redzone: false
+  opt.zero: false
+  opt.tcache: true
+  opt.lg_tcache_max: 15
+CPUs: 12
+Arenas: 48
+Pointer size: 8
+Quantum size: 8
+Page size: 4096
+Min active:dirty page ratio per arena: 8:1
+Maximum thread-cached size class: 32768
+Chunk size: 2097152 (2^21)
+Allocated: 1074509704, active: 1609732096, metadata: 41779072, resident: 1651118080, mapped: 1652555776
+Current active ceiling: 1610612736
+ 
+arenas[0]:
+assigned threads: 1
+dss allocation precedence: secondary
+min active:dirty page ratio: 8:1
+dirty pages: 393001:24 active:dirty, 0 sweeps, 0 madvises, 0 purged
+                            allocated      nmalloc      ndalloc    nrequests
+small:                     1006565256     28412640      9802493     35714594
+large:                         835584           20           11           20
+huge:                        67108864            1            0            1
+total:                     1074509704     28412661      9802504     35714615
+active:                    1609732096
+mapped:                    1650458624
+metadata: mapped: 40202240, allocated: 491904
+bins:           size ind    allocated      nmalloc      ndalloc    nrequests      curregs      curruns regs pgs  util       nfills     nflushes      newruns       reruns
+                   8   0         1992          319           70          357          249            1  512   1 0.486            7            8            1            0
+                  16   1    148618896     14110300      4821619     14310175      9288681        55119  256   1 0.658       141103        48825        55119            5
+                  24   2    112104360      7200400      2529385      7300348      4671015        14064  512   3 0.648        72004        25881        14064            1
+                  32   3          288          112          103      7003270            9            1  128   1 0.070            3            7            1            0
+                  40   4          360          109          100          171            9            1  512   5 0.017            3            7            1            0
+                  48   5         1248          112           86           63           26            1  256   3 0.101            2            5            1            0
+                  56   6          896          106           90           16           16            1  512   7 0.031            2            6            1            0
+                  64   7          128           64           62            5            2            1   64   1 0.031            1            3            1            0
+                  80   8          880          106           95            7           11            1  256   5 0.042            2            4            1            0
+                  96   9         9120          212          117           97           95            1  128   3 0.742            4            6            2            1
+                 112  10          336          109          106            2            3            1  256   7 0.011            3            6            3            0
+                 128  11          640           40           35            4            5            1   32   1 0.156            3            4            2            0
+                 160  12    740617440      7000148      2371289      7000001      4628859        54688  128   5 0.661        70271        24334        54689            4
+                 192  13          768           68           64            1            4            1   64   3 0.062            2            4            2            0
+                 224  14      4683616       100000        79091        99946        20909          781  128   7 0.209         1000         1641          782            0
+                 256  15            0           16           16            4            0            0   16   1 1                1            3            1            0
+                 320  16         5120           64           48           16           16            1   64   5 0.250            1            3            1            0
+                 384  17          768           33           31            2            2            1   32   3 0.062            1            3            1            0
+                 448  18        28672           64            0            0           64            1   64   7 1                1            0            1            0
+                 512  19         1024           10            8            4            2            1    8   1 0.250            1            2            2            0
+                 640  20            0           32           32            1            0            0   32   5 1                1            3            1            0
+                     ---
+                 896  22        48384           85           31           50           54            2   32   7 0.843            2            3            2            0
+                1024  23         3072           10            7            3            3            1    4   1 0.750            1            2            3            0
+                1280  24        20480           16            0            0           16            1   16   5 1                1            0            1            0
+                1536  25        15360           10            0            0           10            2    8   3 0.625            1            0            2            0
+                1792  26        28672           16            0            0           16            1   16   7 1                1            0            1            0
+                2048  27         4096           10            8            2            2            1    2   1 1                1            2            5            0
+                     ---
+                3584  30        35840           10            0            0           10            2    8   7 0.625            1            0            2            0
+                     ---
+                5120  32       250880           49            0           49           49           13    4   5 0.942            0            0           13            0
+                     ---
+                8192  35        81920           10            0            0           10           10    1   2 1                1            0           10            0
+                     ---
+large:          size ind    allocated      nmalloc      ndalloc    nrequests      curruns
+               16384  39        16384            2            1            2            1
+               20480  40        40960            2            0            2            2
+                     ---
+               32768  43        32768            1            0            1            1
+               40960  44        40960           10            9           10            1
+                     ---
+               81920  48        81920            1            0            1            1
+                     ---
+              131072  51       131072            1            0            1            1
+              163840  52       163840            1            0            1            1
+                     ---
+              327680  56       327680            1            0            1            1
+                     ---
+             1048576  63            0            1            1            1            0
+                     ---
+huge:           size ind    allocated      nmalloc      ndalloc    nrequests   curhchunks
+                     ---
+            67108864  87     67108864            1            0            1            1
+                     ---
+--- End jemalloc statistics ---
+(7) 开启自动内存碎片整理
+
+$ redis-cli -p 6383 config set activedefrag yes
+OK
+(8) 等会儿再看看, 发现内存碎片降低了
+
+$ redis-cli -p 6383 info memory
+# Memory
+used_memory:1073740712
+used_memory_human:1024.00M
+used_memory_rss:1253371904
+used_memory_rss_human:1.17G
+used_memory_peak:1608721680
+used_memory_peak_human:1.50G
+used_memory_peak_perc:66.74%
+used_memory_overhead:253906398
+used_memory_startup:766152
+used_memory_dataset:819834314
+used_memory_dataset_perc:76.41%
+total_system_memory:67535904768
+total_system_memory_human:62.90G
+used_memory_lua:37888
+used_memory_lua_human:37.00K
+maxmemory:1073741824
+maxmemory_human:1.00G
+maxmemory_policy:allkeys-lru
+mem_fragmentation_ratio:1.17
+mem_allocator:jemalloc-4.0.3
+active_defrag_running:0
+lazyfree_pending_objects:0
+(9) 可以再看看内存利用率, 可以看到已经上升到0.82
+
+$ echo "`redis-cli -p 6383 memory malloc-stats`"
+___ Begin jemalloc statistics ___
+Version: 4.0.3-0-ge9192eacf8935e29fc62fddc2701f7942b1cc02c
+Assertions disabled
+Run-time option settings:
+  opt.abort: false
+  opt.lg_chunk: 21
+  opt.dss: "secondary"
+  opt.narenas: 48
+  opt.lg_dirty_mult: 3 (arenas.lg_dirty_mult: 3)
+  opt.stats_print: false
+  opt.junk: "false"
+  opt.quarantine: 0
+  opt.redzone: false
+  opt.zero: false
+  opt.tcache: true
+  opt.lg_tcache_max: 15
+CPUs: 12
+Arenas: 48
+Pointer size: 8
+Quantum size: 8
+Page size: 4096
+Min active:dirty page ratio per arena: 8:1
+Maximum thread-cached size class: 32768
+Chunk size: 2097152 (2^21)
+Allocated: 1074509800, active: 1307602944, metadata: 41779072, resident: 1512247296, mapped: 1652555776
+Current active ceiling: 1308622848
+ 
+arenas[0]:
+assigned threads: 1
+dss allocation precedence: secondary
+min active:dirty page ratio: 8:1
+dirty pages: 319239:39882 active:dirty, 4878 sweeps, 6343 madvises, 33915 purged
+                            allocated      nmalloc      ndalloc    nrequests
+small:                     1006565352     35456589     16846439     45126633
+large:                         835584           24           15           24
+huge:                        67108864            1            0            1
+total:                     1074509800     35456614     16846454     45126658
+active:                    1307602944
+mapped:                    1650458624
+metadata: mapped: 40202240, allocated: 491904
+bins:           size ind    allocated      nmalloc      ndalloc    nrequests      curregs      curruns regs pgs  util       nfills     nflushes      newruns       reruns
+                   8   0         1992          319           70          357          249            1  512   1 0.486            7            8            1            0
+                  16   1    148618896     17658482      8369801     17858357      9288681        44332  256   1 0.818       141103        48825        55119        26364
+                  24   2    112104360      8897298      4226283      8997246      4671015        11525  512   3 0.791        72004        25881        14064         6205
+                  32   3          384          115          103      9371363           12            1  128   1 0.093            4            7            1            0
+                  40   4          360          109          100          171            9            1  512   5 0.017            3            7            1            0
+                  48   5         1248          112           86           63           26            1  256   3 0.101            2            5            1            0
+                  56   6          896          106           90           16           16            1  512   7 0.031            2            6            1            0
+                  64   7          128           64           62            5            2            1   64   1 0.031            1            3            1            0
+                  80   8          880          106           95            7           11            1  256   5 0.042            2            4            1            0
+                  96   9         9120          212          117           97           95            1  128   3 0.742            4            6            2            1
+                 112  10          336          109          106            2            3            1  256   7 0.011            3            6            3            0
+                 128  11          640           40           35            4            5            1   32   1 0.156            3            4            2            0
+                 160  12    740617440      8788058      4159199      8787911      4628859        44056  128   5 0.820        70271        24334        54689        26488
+                 192  13          768           68           64            1            4            1   64   3 0.062            2            4            2            0
+                 224  14      4683616       110956        90047       110902        20909          467  128   7 0.349         1000         1641          782          105
+                 256  15            0           16           16            4            0            0   16   1 1                1            3            1            0
+                 320  16         5120           64           48           16           16            1   64   5 0.250            1            3            1            0
+                 384  17          768           33           31            2            2            1   32   3 0.062            1            3            1            0
+                 448  18        28672           64            0            0           64            1   64   7 1                1            0            1            0
+                 512  19         1024           10            8            4            2            1    8   1 0.250            1            2            2            0
+                 640  20            0           32           32            1            0            0   32   5 1                1            3            1            0
+                     ---
+                 896  22        48384           85           31           50           54            2   32   7 0.843            2            3            2            0
+                1024  23         3072           10            7            3            3            1    4   1 0.750            1            2            3            0
+                1280  24        20480           16            0            0           16            1   16   5 1                1            0            1            0
+                1536  25        15360           10            0            0           10            2    8   3 0.625            1            0            2            0
+                1792  26        28672           16            0            0           16            1   16   7 1                1            0            1            0
+                2048  27         4096           10            8            2            2            1    2   1 1                1            2            5            0
+                     ---
+                3584  30        35840           10            0            0           10            2    8   7 0.625            1            0            2            0
+                     ---
+                5120  32       250880           49            0           49           49           13    4   5 0.942            0            0           13            0
+                     ---
+                8192  35        81920           10            0            0           10           10    1   2 1                1            0           10            0
+                     ---
+large:          size ind    allocated      nmalloc      ndalloc    nrequests      curruns
+               16384  39        16384            2            1            2            1
+               20480  40        40960            2            0            2            2
+                     ---
+               32768  43        32768            1            0            1            1
+               40960  44        40960           14           13           14            1
+                     ---
+               81920  48        81920            1            0            1            1
+                     ---
+              131072  51       131072            1            0            1            1
+              163840  52       163840            1            0            1            1
+                     ---
+              327680  56       327680            1            0            1            1
+                     ---
+             1048576  63            0            1            1            1            0
+                     ---
+huge:           size ind    allocated      nmalloc      ndalloc    nrequests   curhchunks
+                     ---
+            67108864  87     67108864            1            0            1            1
+                     ---
+--- End jemalloc statistics ---
+(10) 别急, 还有一个大招: 手动清理
+
+$ redis-cli -p 6383 memory purge
+(11) 再次查看内存使用情况: 发现碎片率降到1.04, 内存利用率到0.998, 内存碎片基本上消灭了^_^
+
+$ redis-cli -p 6383 info memory
+# Memory
+used_memory:1073740904
+used_memory_human:1024.00M
+used_memory_rss:1118720000
+used_memory_rss_human:1.04G
+used_memory_peak:1608721680
+used_memory_peak_human:1.50G
+used_memory_peak_perc:66.74%
+used_memory_overhead:253906398
+used_memory_startup:766152
+used_memory_dataset:819834506
+used_memory_dataset_perc:76.41%
+total_system_memory:67535904768
+total_system_memory_human:62.90G
+used_memory_lua:37888
+used_memory_lua_human:37.00K
+maxmemory:1073741824
+maxmemory_human:1.00G
+maxmemory_policy:allkeys-lru
+mem_fragmentation_ratio:1.04
+mem_allocator:jemalloc-4.0.3
+active_defrag_running:0
+lazyfree_pending_objects:0
+$ 
+配置说明:
+
+# Enabled active defragmentation
+# 碎片整理总开关
+# activedefrag yes
+ 
+# Minimum amount of fragmentation waste to start active defrag
+# 内存碎片达到多少的时候开启整理
+active-defrag-ignore-bytes 100mb
+ 
+# Minimum percentage of fragmentation to start active defrag
+# 碎片率达到百分之多少开启整理
+active-defrag-threshold-lower 10
+ 
+# Maximum percentage of fragmentation at which we use maximum effort
+# 碎片率小余多少百分比开启整理
+active-defrag-threshold-upper 100
+ 
+# Minimal effort for defrag in CPU percentage
+active-defrag-cycle-min 25
+ 
+# Maximal effort for defrag in CPU percentage
+active-defrag-cycle-max 75
+总结: 
+
+从测试的结果看, 效果还是非常不错的, 另外在配置中我们可以看到如下一段声明:
+
+
+
+说明现在这个功能还是实验性质的, 对应的命令在官方文档中都没有看到. 但是它也说经过了压力测试, 而且现在也一年多了, 经受了一些考验, 可以尝试小流量上线观察
+
+TODO redis 内存碎片整理实现
+
+
