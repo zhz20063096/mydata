@@ -1,0 +1,225 @@
+nginx出现502有很多原因，但大部分原因可以归结为资源数量不够用,也就是说后端PHP-fpm处理有问题，nginx将正确的客户端请求发给了后端的php-fpm进程，
+但是因为php-fpm进程的问题导致不能正确解析php代码，最终返回给了客户端502错误。
+
+nginx+php出现502 bad gateway，一般这都不是nginx的问题，而是由于 fastcgi或者php的问题导致的，常见的有以下几种(其实解决问题的最好的方式还是
+自己去看nginx和fastcgi的errorlog):
+
+ 
+
+1. php.ini的memory_limit 过小（如果有个别php程序进程需要占用极大内存时这个必须注意）
+
+2. php-fpm.conf中max_children或者max_requests  设置不合理（设置过小会因为没有足够的cgi进程处理请求，设置过大会出现一会儿有响应正常，一会儿
+等很久才有响应的情况，一般情况下children按 照内存计算，比如说1G设置64，2G128。这个根据实际情况自行调整。另外查看当前的PHP FastCGI进程数是否够
+用的命令为：netstat  -anpo |grep “php-cgi” | wc -l   如果实际使用的“FastCGI进程数”接近预设的“FastCGI进程数”，那么，说明“FastCGI进程数
+”不够用，需要增大。）
+
+3. 查看nginx错误日志，发现 pstream sent too big header while reading response  headerfrom upstream ，则检查client head buffer，
+fastcgi buffer  size是否过小，可设置为32K。
+
+4. php程序执行时间过长而超时，检查nginx和fastcgi中各种timeout设置。（nginx 中的  fastcgi_connect_timeout 300;fastcgi_send_timeout
+300  ：fastcgi_read_timeout300; keepalive_timeout ；  php-fpm中的request_terminate_timeout，php.ini中的max_execution_time）
+
+ 
+
+5. php-fpm有一个参数 max_requests ，该参数指明了每个children最多处理多少个请求后便会被关闭。在大量处理请求下，如果该值设置过小会导致
+children频繁的自杀和建立而浪费 大量时间，若所有的children差不多都在这个时候自杀，则重建前将没有children响应请求，于是出现502  。可以将该值
+设置大一些或者是0[无限]。
+
+如果你服务器并发量非常大，那只能先增加机器，然后按以下方式优化会取得更好效果;但如果你并发不大却出现502，一般都可以归结为配置问题，脚本超时问题。
+
+1.php-fpm进程数不够用
+
+使用netstat -napo |grep "php-fpm" | wc -l查看一下当前fastcgi进程个数，如果个数接近conf里配置的上限，就需要调高进程数。
+
+但也不能无休止调高，可以根据服务器内存情况，可以把php-fpm子进程数调到100或以上，在4G内存的服务器上200就可以。
+
+2. 调高调高Linux内核打开文件数量
+
+可以使用这些命令(必须是root帐号)
+
+echo 'ulimit -HSn 65536'>> /etc/profile
+
+echo 'ulimit -HSn 65536'>> /etc/rc.local
+
+source /etc/profile
+
+ 3.脚本执行时间超时
+
+如果脚本因为某种原因长时间等待不返回，导致新来的请求不能得到处理，可以适当调小如下配置。
+
+nginx.conf里面主要是如下
+
+fastcgi_connect_timeout 300;
+fastcgi_send_timeout 300;
+fastcgi_read_timeout 300;
+
+php-fpm.conf里如要是如下
+
+request_terminate_timeout =10s
+
+4.缓存设置比较小
+
+修改或增加配置到nginx.conf
+
+proxy_buffer_size 64k;
+proxy_buffers  512k;
+proxy_busy_buffers_size 128k;
+
+5. recv()failed (104: Connection reset by peer) while reading response header fromupstream
+
+可能的原因机房网络丢包或者机房有硬件防火墙禁止访问该域名
+
+但最重要的是程序里要设置好超时，不要使用php-fpm的request_terminate_timeout，
+
+最好设成request_terminate_timeout=0;
+
+因为这个参数会直接杀掉php进程，然后重启php进程，这样前端nginx就会返回104: Connection reset by peer。这个过程是很慢，总体感觉就是网站很卡。
+
+May 01 10:50:58.044162[WARNING] [pool www] child 4074, script'/usr/local/nginx/html/quancha/sameip/detail.php' execution
+timed out(15.129933 sec), terminating
+May 01 10:50:58.045725 [WARNING] [pool www] child 4074 exited on signal 15SIGTERM after 90.227060 seconds from start
+May 01 10:50:58.046818 [NOTICE] [pool www] child 4082 started
+
+说一千道一万最重要的就是程序里控制好超时，gethostbyname、curl、file_get_contents等函数的都要设置超时时间。
+
+另一个就是多说，这个东西是增加了网站的交互性，但是使用的多了反应就慢了，如果你网站超时且使用了多说是，可以关闭它。
+
+6、自己遇到502的解决办法：
+调整增大php 和Nginx 的backlog数。
+
+PHP-FPM高负载的解决办法
+Postedon 2011/09/02
+
+这里只是介绍了php-fpm的优化方法的，但一般情况下和nginx组合使用的时候，单独优化其中一项的话，作用不是特别的大，同时还需要对nginx进行优化．
+nginx的做法方法参考：http://blog.haohtml.com/archives/6213.上面的优化前和优化后的图，看得出前后差距还是特别的大的．
+
+导致nginx 502 bad gateway的PHP-CGI(FASTCGI)
+
+NGINX频爆502 BAD GATEWAY的错误，看了网上的教程，仍没有彻底解决。
+目前我总结的解决502 BAD GATEWAY的方式有：
+
+1.视服务器的性能，在php-fmp.conf里增加max_children的值:
+
+max_children是PHP-FPM Pool 最大的子进程数,他数值取决于你的服务器内存。 假设你打算给10G内存给当前配置的PHP-FPM Pool，一般一个PHP请求占
+用内存10M-40M，我们按站点每个PHP请求占用内存25M，这样max_children = 10G/25M = 409。所以，这个值可以根据情况算出来
+
+max_requests是每个子进程重生之前处理的请求数， 默认值为unlimited（默认为1024），可以设置小一点（如500左右），这样可以避免内存泄露带来的问题
+
+Nginx代理过程，将业务服务器请求数据缓存到本地文件，再将文件数据转发给请求客户端。高并发的客户端请求，必然要求服务器文件句柄的并发打开限制。使用
+ulimit命令（ulimit -n），查看Linux系统文件句柄并发限制，默认是1024，我们可以改为65535（2 的 16 次方，这是系统端口的极限）。修改的方法为：
+修改系统文件/etc/security/limits.conf，添加如下信息，并重新启动系统生效。
+
+* soft   nofile  65535
+
+ 
+
+* hard   nofile  65535
+
+然后在Nginx配置文件中，把文件限制及连接数信息改为65535：
+
+worker_rlimit_nofile 65535;
+
+events {
+
+    use epoll;
+
+    worker_connections  65535;
+
+}
+
+ 
+
+2.用reload参数定时重载php-fpm。这个主要原因是php脚本执行时间过长造成的，重载php-fpm能杜绝这个问题。如何彻底解决php-cgi脚本占用大量内存从而
+导致502错误的产生还值得进一步探讨，目前该做法不失为一种好办法。
+具体的做法是，用crontab让php-fpm平滑重启，从而不影响PHP脚本的运行。
+
+*/10* * * * /usr/local/php/sbin/php-fpm reload
+
+＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝ 优化设置＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝
+
+ 
+
+如果您高负载网站使用PHP-FPM管理FastCGI，这些技巧也许对您有用：)
+
+1.Compile PHP’s modules as less as possible, the simple the best (fast);
+1.尽量少安装PHP模块，最简单是最好（快）的
+
+2. Increas PHP FastCGI child number to 100 and even more.Sometime, 200 is OK! ( On 4GB memory server);
+
+2.把您的PHP FastCGI子进程数调到100或以上，在4G内存的服务器上200就可以
+注：我的1g测试机，开64个是最好的，建议使用压力测试获取最佳值
+
+3.Using SOCKET PHP FastCGI, and put into /dev/shm on Linux;
+3.使用socket连接FastCGI，linux操作系统可以放在/dev/shm中
+注：在php-fpm.cnf里设置<valuename=”listen_address”>/tmp/nginx.socket</value>就可以通过socket连接FastCGI了，/dev/shm是内存文件系统，
+放在内存中肯定会快了.记得这时也要在nginx里的配置里进行修改，保持一致．
+
+location~ .*/.(php|php5)?$
+
+{
+
+#
+
+将Nginx与FastCGI的通信方式由TCP改为UnixSocket。TCP在高并发访问下比UnixSocket稳定，但Unix Socket速度要比TCP快。
+
+fastcgi_pass  unix:/tmp/php-cgi.sock;
+
+#fastcgi_pass  127.0.0.1:9000;
+
+fastcgi_index index.php;
+
+include fcgi.conf;
+
+}
+
+4. Increase Linux “max open files”, using the following command(must be root):
+
+# echo ‘ulimit -HSn 65536′>> /etc/profile
+
+# echo ‘ulimit -HSn 65536 >> /etc/rc.local
+
+# source /etc/profile 
+
+
+4.调高linux内核打开文件数量，可以使用这些命令(必须是root帐号
+
+)
+
+echo ‘ulimit -HSn 65536′ >> /etc/profile
+
+echo ‘ulimit -HSn 65536′ >> /etc/rc.local
+
+source /etc/profile 
+
+
+注：我是修改/etc/rc.local，加入ulimit -SHn 51200的
+
+5.Increase PHP-FPM open file description rlimit:
+
+# vi /path/to/php-fpm.conf
+
+Find “<value name=”rlimit_files”>1024</value>”
+
+Change 1024 to 4096 or higher number.
+
+Restart PHP-FPM.
+
+
+5.增加 PHP-FPM 打开文件描述符的限制
+
+# vi /path/to/php-fpm.conf
+
+找到
+
+“<value name=”rlimit_files”>1024</value>”
+
+把1024更改为4096或者更高
+
+.
+
+重启PHP-FPM.
+
+6. Using PHP code accelerator,e.g eAccelerator, XCache. And set “cache_dir” to /dev/shm on Linux.
+6.使用php代码加速器，例如eAccelerator, XCache.在linux平台上可以把`cache_dir`指向/dev/shm
+
+原文：https://blog.csdn.net/u011007133/article/details/54908335
