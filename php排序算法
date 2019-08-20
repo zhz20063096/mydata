@@ -102,9 +102,53 @@
     }
     
     
-    
-    
-    
+  数组全排列算法（递归组合）：  
+  $arrStr="0123456789abcdefghijklmnopqrstuvwxyz";
+  //$arrStr = "12345";
+  $arr=str_split($arrStr); 
+  $strMin=3; 
+  $strMax=5;
+  $results=array();
+  for($i=$strMin; $i<=$strMax; $i++){
+      makeDic('', $arr, $i, 1, $results);
+  }
+  print_r($results);
+  
+  function makeDic($strFirst, $arr, $strMin, $tmp, &$results){
+      for($i=0; $i<count($arr); $i++){
+          if($tmp == $strMin){
+              $results[] = $strFirst.$arr[$i];
+          } else {
+              makeDic($strFirst.$arr[$i], $arr, $strMin, $tmp+1, $results);
+          }
+       }
+  }
+  
+  
+  数组求定和（递归相减，循环尝试）：
+  $_arr = array(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20);
+  $results = array();
+  for($t = 0; $t < count($_arr); $t++){
+      getSetBySum($_arr, 30, $t, 30);
+  }
+  print_r($results);exit;
+  
+  function getSetBySum($_array, $_sum, $_index, $_current, $_return=''){
+      global $results;
+      for($i = $_index; $i < count($_array); $i++){
+          if($_current - $_array[$i] == 0 && $_sum - $_array[$i] == 0){  //找到一个
+              $_return .= $_array[$i].'<br/>';
+              $results[] = $_return;
+          }else if($_current - $_array[$i] > 0 ){ //继续找
+              $_return .= $_array[$i].'+';
+              $_sum -= $_array[$i];
+              for( $j = $i+1; $j < count($_array); $j++){
+                  getSetBySum($_array, $_sum, $j, $_current - $_array[$i], $_return);
+              }
+          }
+      }
+  }
+ 
     
     
     
