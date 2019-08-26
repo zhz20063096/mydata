@@ -5,14 +5,21 @@
 
 性能上Swoole毕竟是C语言开发的，在某些地方如内存管理、数据结构、通信协议解析上肯定要比PHP开发的workerman高。
 
-功能上swoole提供的高级特性很多，列举几个workerman没有的吧，比如SSL/TLS隧道加密、http2.0、异步mysql驱动、异步redis驱动、异步的http/websocket客户端、process、lock、atomic、table。另外Swoole 2.0内置了PHP原生协程的支持，PHP代码也可以使用类似于Go语言的协程来实现高并发的网络服务器。
+功能上swoole提供的高级特性很多，列举几个workerman没有的吧，比如SSL/TLS隧道加密、http2.0、异步mysql驱动、异步redis驱动、异步的
+http/websocket客户端、process、lock、atomic、table。另外Swoole 2.0内置了PHP原生协程的支持，PHP代码也可以使用类似于Go语言的协程来实
+现高并发的网络服务器。
 
-外部依赖上workerman需要依赖很多额外的第三方PHP扩展来实现，局限性比较大，这些扩展并非是PHP官方维护的，维护性方面良莠不齐，有些扩展连PHP7都不支持，数年没人维护。而Swoole基本上无依赖，底层的代码全部可控。
+外部依赖上workerman需要依赖很多额外的第三方PHP扩展来实现，局限性比较大，这些扩展并非是PHP官方维护的，维护性方面良莠不齐，有些扩展连PHP7都
+不支持，数年没人维护。而Swoole基本上无依赖，底层的代码全部可控。
 
 开发维护方面，Swoole的开发团队目前有大概18人左右，开发者基本上都是来自腾讯、百度、阿里、滴滴、微博等国内一线互联网企业，支持维护的团队更稳定。
 
-当然workerman的优势是它完全使用PHP代码实现，开发者可以直接看它的源码。有特殊需求也可以直接改源码来实现。如果换成swoole就不是那么简单了。workerman做的事情更多一些，即是框架又是工具和完整的解决方案，对于没有太多后端编程功底的程序员也来说确实会容易很多。而swoole实际上只是一个底层库，不是拿来可用的完整产品，基于swoole有很多PHP的框架和程序，比如tsf、zan php framework、hprose-swoole、zphp、swoole/framework、blink、dorarpc、SwooleDistributed等等，普通开发者可以直接基于这些项目进行开发。
+当然workerman的优势是它完全使用PHP代码实现，开发者可以直接看它的源码。有特殊需求也可以直接改源码来实现。如果换成swoole就不是那么简单了。
+workerman做的事情更多一些，即是框架又是工具和完整的解决方案，对于没有太多后端编程功底的程序员也来说确实会容易很多。而swoole实际上只是一个底层库，
+不是拿来可用的完整产品，基于swoole有很多PHP的框架和程序，比如tsf、zan php framework、hprose-swoole、zphp、swoole/framework、blink、
+dorarpc、SwooleDistributed等等，普通开发者可以直接基于这些项目进行开发。
 
-Swoole是给高手用的，门槛比较高，需要使用者有深厚的功底。你这里问的哪个更容易开发，这个没办法回答，这个要看你要开发什么、团队或个人的实际情况如何，合适的才是最好的。
+Swoole是给高手用的，门槛比较高，需要使用者有深厚的功底。你这里问的哪个更容易开发，这个没办法回答，这个要看你要开发什么、团队或个人的实际情况如何，
+合适的才是最好的。
 
 原文：https://www.zhihu.com/question/47994137?from=profile_question_card
