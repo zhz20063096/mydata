@@ -82,7 +82,7 @@ mysql默认的事务隔离级别为repeatable-read
 
  
 
-　　2、读已提交
+　　2、读已提交（行锁）
 
 　　　　（1）打开一个客户端A，并设置当前事务模式为read committed（未提交读），查询表account的所有记录：
 
@@ -106,7 +106,7 @@ mysql默认的事务隔离级别为repeatable-read
 
  
 
- 　　3、可重复读
+ 　　3、可重复读（间隙锁）
 
  　　　　（1）打开一个客户端A，并设置当前事务模式为repeatable read，查询表account的所有记录
 
@@ -136,7 +136,7 @@ mysql默认的事务隔离级别为repeatable-read
 
  
 
-　　4.串行化
+　　4.串行化（表锁）
 
 　　　　（1）打开一个客户端A，并设置当前事务模式为serializable，查询表account的初始值：
 
