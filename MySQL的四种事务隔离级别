@@ -31,11 +31,11 @@
 
 三、MySQL事务隔离级别
 
-事务隔离级别	                脏读	不可重复读	 幻读   锁        原理
-读未提交（read-uncommitted）	 是	    是	     是             产生脏读
-不可重复读（read-committed）	  否	     是	    是    行锁      使用行锁，解决脏读  但产生可复读
-可重复读（repeatable-read）	   否	    否	     是    间隙锁    使用间隙锁，解决可复读，但产生幻读
-串行化（serializable）	       否	     否	   否     表锁     使用表锁，解决幻读
+事务隔离级别	                脏读	不可重复读	 幻读    锁        原理
+读未提交（read-uncommitted）	 是	    是	     是               产生脏读
+读已提交（read-committed）	   否	    是	     是     行锁       使用行锁，解决脏读  但产生可复读
+可重复读（repeatable-read）	   否	    否	     是     间隙锁     使用间隙锁，解决可复读，但产生幻读
+串行化（serializable）	        否	     否	    否     表锁      使用表锁，解决幻读
  
 
  
