@@ -1,0 +1,124 @@
+版权声明：本文为博主原创文章，遵循 CC 4.0 BY-SA 版权协议，转载请附上原文出处链接和本声明。
+本文链接：https://blog.csdn.net/leo_jk/article/details/84635305
+用模式开发的优点是，能让我们的逻辑结构以及代码更加清晰，便于维护！
+
+而我们为什么要用 “观察者模式”？这就需要从实际运用中来理解才能更好的运用！用如下的情境来说明吧。
+
+事例，开始时我被安排做项目的登录，很快我就完成了。然后产品提出了另一个需求，用户登录后，给他们推送一条实时消息！然后我在登录成功的逻辑后加了一段代码，
+完成了登录后的实时消息推送。然而事情还没有完，产品又给加了个需求，需要给新登录的用户10块钱红包奖励，这个当然很简单，我又在消息推送后加了代码，
+完成了新登录用户的红包奖励（钱怎么到账的过程暂且不论），然而事情还没完没了了，产品不断的在加需求了，如非vip用户登录，给他推送10条需要注册VIP才
+能打开的信息，如根据客户习惯推送10条客户偏好的信息，如vip快到期的客户需要在客户登录后提醒要充值啦。。。。。。。等等，如是这般，那我就得不停的在
+登录后加代码，变得我开始看不懂哪个xxx写的代码了！
+
+那么此时我们就得考虑用‘观察者模式’了
+
+可以以这样的方式简单明了形容 观察者模式， 某个商场门口安排一个人进行观察，观察到有a类型的顾客进门，立即安排敲锣、打鼓、送鲜花，观察到有b类客户，
+立即安排购物袋，观察到c类客户，嗯嗯感觉他是来打酱油了，安排不要浪费表情了，什么欢迎仪式也没有。。。。。也就是说 观察者就是个‘势利眼’，看人下彩，
+根据观察给进来的顾客安排对应的某个服务或者某些服务！也许这个形容还不够恰当，但大体意思差不多了。
+
+接下来就是重点了，描述了观察者模式的轮廓，那么就需要转化为代码来实际运用了！
+
+一、首先得有两个接口类，用以框定观察者模式，
+
+        一个被观察者接口类（一般申明有三个必须方法：1.添加观察者对象的方法，2.删除观察者对象的方法 ，3.通知观察者进行  相应执行的方法），
+
+        一个观察者接口类（一般只有一个必须方法，就是执行）
+
+如果直接甩代码可能有点难理解，那么就先给个示意图来明确一下吧！
+
+
+
+二、根据观察者接口类的框定我们定下接口类如下代码：
+
+(示例是网上抄的，因为易于理解，申明一下出处，网址：https://www.cnblogs.com/DeanChopper/p/4830134.html)：
+
+<?php
+// 被观察者接口
+interface Subject{
+    public function register(Observer $observer);  //添加（注册）观察者对象
+    public function detach(Observer $observer);    //删除观察者对象
+    public function notify();                      //通知观察者执行相应功能
+}
+// 观察者接口
+interface Observer{
+    public function watch();   //观察者要执行的方法
+}
+三、根据框定的结构，大概的理解一下就是，要实现 被观察者对象 存储各种观察者对象（完成各种功能的对象）存储起来，然后通只各观察者执行自己的功能，
+先看看如下的实现代码
+
+<?php
+// 被观察者继承类
+class Action implements Subject{
+ 
+     public $_observers=array(); //用于存储观察者对象
+ 
+     //用于添加（注册）观察者对象
+     public function register(Observer $observer){
+         $this->_observers[]=$observer;
+     }
+ 
+     //用于删除观察者对象
+     public function detach(Observer $observer){
+ 
+        $index = array_search($observer, $this->_observers);
+ 
+        if ($index === FALSE || ! array_key_exists($index, $this->_observers)) {
+            return FALSE;
+        }
+ 
+        unset($this->_observers[$index]);
+        return TRUE;
+     }
+ 
+     //通知各观察者
+     public function notify(){
+ 
+         //****重点，其实就是循环中执行各观察这对象的watch方法，不同功能方法内容不同但方法名相同
+         foreach ($this->_observers as $observer) {
+             $observer->watch();
+         }
+ 
+     }
+ }
+ 
+// cat观察者继承类
+class Cat implements Observer{
+     public function watch(){
+         echo "Cat watches TV<hr/>";
+     }
+ } 
+ 
+ //dog观察者继承类
+ class Dog implements Observer{
+     public function watch(){
+         echo "Dog watches TV<hr/>";
+     }
+ } 
+ //people观察者继承类
+ class People implements Observer{
+     public function watch(){
+         echo "People watches TV<hr/>";
+     }
+ }
+好了，我们现在通过上面的继承就能明白了，观察者就是定义各种功能的对象（这些对象就是：比如给第一次登录的用户发红包，给用户最新的10条文章推送，
+给非vip用户推送10条需要注册才能打开的视频诱导用户开通vip。。。。），被观察者对象要实现的就是 将添加（注册）的观察者对象存储起来并逐个通知执行
+观察者各自的功能，
+
+四、那么就进行实例化对象进行操作了！代码如下：
+
+// 应用实例
+$action=new Action();
+$action->register(new Cat());
+$action->register(new People());
+$action->register(new Dog());
+$action->notify();
+到这里我想如果应该是有所理解了，如果我的理解有误请提建议，当然这只是观察者模式的一个简单过程，实际开发中会有所改动，当然大体脉络就是这样的！
+
+还有一点个人的观点是，如果我们需要搞清楚各种开发模式运用，那么就要从它能解决的需求理解，面向对象编程它是来源于生活，应用于生活的，从这种模式解决
+的需求上进行理解，然后我们才能明白架构定义出来的代码（说得玄一点就是将 想法转化为代码来实现，通过代码 得到我们想要的结果） 。写下这些其实也不为其他，
+只是想加深自己的印象，同时也希望对其他 同行的朋友有所助益！
+————————————————
+版权声明：本文为CSDN博主「leo_jk」的原创文章，遵循 CC 4.0 BY-SA 版权协议，转载请附上原文出处链接及本声明。
+原文链接：https://blog.csdn.net/leo_jk/article/details/84635305
+
+
