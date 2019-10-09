@@ -7,6 +7,9 @@ uniq -c 中的-c 代表在每列旁边显示该行重复出现的次数
 sort 的 -n：依照数值的大小排序；-r 按照相反顺序排列
 > 将结果输出到文件中
 
+从根目录开始查找所有扩展名为.log的文本文件，并找出包含”ERROR”的行:
+find / -type f -name "*.log" | xargs grep "ERROR"
+
 批量杀死含有某个字符串(hello)的进程
 ps -ef | grep hello | grep -v 'grep' | awk '{print $2}' |xargs kill -9 
 
