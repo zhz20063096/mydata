@@ -1,6 +1,6 @@
 
 1. awk 
-cat check_info.log.2017-09-20 | awk -F '(txt=|&client)' '{print $2}'| sort | uniq -c | sort -nr > testfile
+cat check_info.log.2017-09-20 | awk -F '(txt=|&client)' '{print $0}'| sort | uniq -c | sort -nr > testfile
 -F 指定每一行的分隔符
 {print $2} 第二个值打印出来
 uniq -c 中的-c 代表在每列旁边显示该行重复出现的次数 
