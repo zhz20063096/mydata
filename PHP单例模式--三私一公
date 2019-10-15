@@ -144,3 +144,42 @@ class mysqlFactory{
 $obj = mysqlFactory::factory('pdo2');
 $obj->connect();
 
+
+
+装饰器模式：允许向一个现有的对象添加新的功能，同时又不改变其结构。
+//定义一个小汽车接口
+interface Car
+{
+    public function getPrice();
+}
+//定义一个基础汽车类，设置价格是100000
+class BaseCar implements Car
+{
+    public function getPrice()
+    {
+        return 100000;
+    }
+}
+//带保险的汽车，价格增加5000
+class SafeCar implements Car
+{
+    public function __construct(Car $Car)
+    {
+        $this->Car = $Car;
+    }
+
+    public function getPrice()
+    {
+        return $this->Car->getPrice() + 5000;
+    }
+}
+
+// 先买一个车
+$Car = new Car();
+//在用保险去装饰这个车
+$SafeCar = new SafeCar($Car);
+//打印现在车的价格
+echo $SafeCar->getPrice();
+
+
+
