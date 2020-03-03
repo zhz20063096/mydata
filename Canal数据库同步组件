@@ -17,7 +17,6 @@
     2）通过Canal同步数据库数据变更事件，并由下游的消费者消费，将数据转存到ES或者跨机房的DB中。
 
     原理相对比较简单：
-
        canal模拟mysql slave的交互协议，伪装自己为mysql slave，向mysql master发送dump协议
        mysql master收到dump请求，开始推送binary log给slave(也就是canal)
        canal解析binary log对象(原始为byte流)
