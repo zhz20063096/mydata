@@ -1,5 +1,9 @@
 原文地址：https://www.cnblogs.com/huanxiyun/articles/5413755.html
 
+
+select 和 epoll ：
+select 总结为：1.连接数受限  2.查找配对速度慢 3.数据由内核拷贝到用户态消耗时间
+epoll  总结为  1.没有最大并发连接的限制 2.它只管你“活跃”的连接  3.共享内存
  
 一个master进程,支持多个pool,每个pool由master进程监听不同的端口,pool中有多个worker进程. 
 每个worker进程都内置PHP解释器,并且进程常驻后台,支持prefork动态增加. 
