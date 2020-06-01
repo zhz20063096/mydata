@@ -1,4 +1,5 @@
 原文地址：https://blog.csdn.net/h330531987/article/details/74364681
+原文地址：https://www.jb51.net/article/73788.htm
 
 PHP7 已经出来1年了，PHP7.1也即将和大家见面，这么多好的特性，好的方法，为什么不使用呢，也希望PHP越来越好。 
 在这里整理 PHP 5.1 ，PHP5.2,PHP5.3,PHP5.4,PHP5.5,PHP5.6 ,PHP7,PHP7.1 所有新特性，已备大家学习及使用 
@@ -1135,3 +1136,211 @@ mktime() 的 is_dst 参数. 使用新的时区处理函数替代.
 已弃用的多个特性 allow_call_time_pass_reference、define_syslog_variables、highlight.bg、register_globals、
 register_long_arrays、magic_quotes、safe_mode、zend.ze1_compatibility_mode、session.bug_compat42、
 session.bug_compat_warn 以及 y2k_compliance。
+
+
+
+另原文地址：
+
+截止到目前为止，PHP官方已经发布了php7的RC5版本，预计在11月份左右会发布第一个正式版本！现在来说php7的重大特性肯定已经是定型了，不会再有什么变动了。后续一些版本的迭代主要也就是修修bug，优化之类的。下面就来说话我们一直期待的php7会有那些主要的变化了。。。
+新特性预览
+
+ZEND引擎升级到Zend Engine 3，也就是所谓的PHP NG
+增加抽象语法树，使编译更加科学
+64位的INT支持
+统一的变量语法
+原声的TLS - 对扩展开发有意义
+一致性foreach循环的改进
+新增 <=>、**、?? 、\u{xxxx}操作符
+增加了返回类型的声明
+增加了标量类型的声明
+核心错误可以通过异常捕获了
+增加了上下文敏感的词法分析
+移除的一些特性
+
+1.移除一些旧的扩展，被移迁移到了PECL（例如：mysql）
+2.移除SAPIs的支持
+3.<?和<? language=“php”这样的标签被移除了
+4.16进制的字符串转换被废除了
+
+//PHP5
+"0x10" == "16"
+ 
+//PHP7
+"0x10" != "16"
+
+5.HTTP_RAW_POST_DATA移除了（可以使用php://input替代）
+6.静态函数里面不再支持通过一个不兼容的$this调用一个非静态的函数了
+$o = & new className{}，不再支持这样的写法
+7.php.ini文件移除了#作为注释，统一用;去注释
+一些行为的改变
+
+不在支持函数定义同名参数
+类型的同名构造函数不推荐使用了（目前没有移除，后续会移除）
+String、int、float等这些关键字不能被作为类名使用了
+func_get_args()获取的是当前变量的值
+
+function test ($num) {
+  $num++;
+  var_dump(func_get_args()[0]);
+};
+ 
+test(1)
+ 
+//PHP5
+int(1)
+ 
+//PHP7
+int(2)
+下面就挑选了一些主要的、核心的、对我们PHPer来说比较重要的特性介绍一下
+PHP NG
+
+新的php引擎优化了很多地方，也正式因为如此，才使得php7相对于php5性能有了接近两倍的提升！
+
+ZVAL结构的重构
+
+
+左边是PHP5的zval(24字节)，右边是PHP7的zval(16字节);
+
+可以看出来php7的zval要比php5还要复杂，但是却能从24个字节下降到16个字节,为什呢？
+
+在C语言中struct的每一个成员变量要各自占据一块独立的内存空间,而union里的成员变量是共用一块内存空间（php7中大量使用union替换了struct）。因此,虽然成员变量看起来多了不少,但是实际占据的内存空间有很多都是公用的却下降了。
+使用新的Zend Array替换之前的HashTale结构
+我们php程序中使用最多、最有用、最方便、最灵活的就是数组了，而php5它的底层就是HashTable实现的，php7使用了新的Zend Array类型，性能和访问速度上都有了大幅度提升！
+一些非常常用，开销不大的的函数直接变成了引擎支持的opcode
+
+call_user_function(_array) => ZEND_INIT_USER_CALL
+is_int/string/array/* => ZEND_TYPE_CHECK
+strlen => ZEND_STRLEN
+defined => ZEND+DEFINED
+使用了新的内存分配，管理方式，减少了内存的浪费
+核心排序zend_sort的优化
+
+//PHP5 - 快速排序（非稳定排序）
+array(1 => 0, 0 => 0)
+ 
+//PHP7 - 快速排序+选择排序（稳定排序）
+array(0 => 0, 1 => 0)
+小于16个元素的使用选择排序，大于16个按照16个为单位去分割，分别使用选择排序，然后再全部合起来使用快速排序。排序较之前相比，内部元素由非稳定排序变成稳定排序，减少元素的交换次数，减少对内存的操作次数，性能提升40%
+抽象语法树
+
+
+
+假如现在我们有这样的需求，要对php源文件就行语法检测，实现编码规范。php5之前的话，没有AST，直接从parser就生成了opcodes！就需要借助一些外部的php语法解析器来实现；而php7增加了AST，我们可以自己去实现这样一个扩展，利用扩展提供的函数可以直接获取文件对应的的AST结构，而这样的结构正是我们可以识别的，所以就可以在这个基础上去做一些优化和判断了。
+64位的INT支持
+
+支持存储大于2GB的字符串
+支持上传大小大于2GB的文件
+保证字符串在所有平台上【64位】都是64bit
+统一的语法变量
+$$foo['bar']['baz']
+ 
+//PHP5
+($$foo)[‘bar']['baz']
+ 
+//PHP7: 遵循从左到右的原则
+${$foo[‘bar']['baz']}
+foreach循环的改进
+
+//PHP5
+$a = array(1, 2, 3);foreach ($a as $v){var_dump(current($a));}
+int(2)
+int(2)
+int(2)
+ 
+$a = array(1, 2, 3);$b=&$a;foreach ($a as $v){var_dump(current($a));}
+int(2)
+int(3)
+bool(false)
+ 
+$a = array(1, 2, 3);$b=$a;foreach ($a as $v){var_dump(current($a));}
+int(1)
+int(1)
+int(1)
+ 
+//PHP7：不再操作数据的内部指针了
+$a = array(1, 2, 3);foreach ($a as $v){var_dump(current($a))}
+int(1)
+int(1)
+int(1)
+ 
+$a = array(1, 2, 3);$b=&$a;foreach ($a as $v){var_dump(current($a))
+int(1)
+int(1)
+int(1)
+ 
+$a = array(1, 2, 3);$b=$a;foreach ($a as $v){var_dump(current($a))}
+int(1)
+int(1)
+int(1)
+新增的几个操作符
+//<=> - 比较两个数的大小【-1：前者小于后者，0：前者等于后者，1：前者大于后者】
+echo 1 <=> 2;//-1
+echo 1 <=> 1;//0
+echo 1 <=> 0;//1
+ 
+// ** - 【a的b次方】
+echo 2 ** 3;//8
+ 
+//?? - 三元运算符的改进
+//php5
+$_GET['name'] ? $_GET['name'] : '';//Notice: Undefined index: …
+//php7
+$_GET['name'] ?? '' -> '';
+ 
+//\u{xxxx} - Unicode字符的解析
+echo "\u{4f60}";//你
+echo "\u{65b0}";//新
+返回类型的声明
+function getInt() : int {
+  return “test”;
+};
+ 
+getInt();
+ 
+//PHP5
+#PHP Parse error: parse error, expecting '{'...
+ 
+//PHP7
+#Fatal error:Uncaught TypeError: Return value of getInt() must be of the type integer, string returned 
+标量类型的声明
+
+function getInt(int $num) : int {
+  return $num;
+};
+ 
+getInt(“test”);
+ 
+//PHP5
+#PHP Catchable fatal error: Argument 1 passed to getInt() must be an instance of int, string given…
+ 
+//PHP7
+#Fatal error: Uncaught TypeError: Argument 1 passed to getInt() must be of the type integer, string given…
+核心错误可以通过异常捕获了
+
+
+try {
+  non_exists_func();
+} catch(EngineException $e) {
+  echo “Exception: {$e->getMessage();}\n”;
+}
+ 
+//这里用php7试了一下还是没法捕获，但是看鸟哥介绍说是可行的。。。
+#Exception: Call to undefined function non_exists_func()
+上下问敏感的词法分析
+
+//PHP5
+class Collection {public function foreach($arr) {}}
+#Parse error: parse error, expecting `"identifier (T_STRING)”'...
+ 
+//PHP7
+class Collection {
+  public function foreach($arr) {}
+  public function in($arr){}
+  public function where($condition){}
+  public function order($condition){}
+}
+$collection = new Collection();
+$collection->where()->in()->foreach()->order();
+差不多了，基本上就把自己对php7的初步了解说完了，其中肯定有很多不对的、低级的错误，希望各位兄弟及时指正，我好改一下，做个笔记！嘿嘿！
+
+
