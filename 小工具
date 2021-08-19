@@ -1,0 +1,25 @@
+public static function getDjDuration($halldj)
+{
+    if(empty($halldj)) return false;
+    $day =  date('Y-m-d', strtotime($halldj->open_at));
+    $jshour =  date('G', strtotime($halldj->open_at));
+    $jehour =  date('G', strtotime($halldj->close_at));
+    //echo $halldj->open_at."========".$halldj->close_at."\n";
+    $jehour = $jshour > $jehour ? $jehour + 24 : $jehour;
+    for($i = $jshour; $i <= $jehour; $i++){
+        $j = $i >= 24 ? $i - 24 : $i;
+        if($j + 1 >= 24) {
+            $day = date("Y-m-d", strtotime("$day + 1day"));
+        }
+        $h = $j + 1;
+        $h = $h >= 24 ? 0 : $h;
+        $next = $day.' '.$h.":00:00";
+        if($i == $jehour){
+            $next =  $halldj->close_at;
+        }
+        //$duration[$j] = $next ."========".($next1 ?? $halldj->open_at);
+        $duration[$j] = strtotime($next) - strtotime($next1 ?? $halldj->open_at);
+        $next1 = $next;
+    }
+    return $duration;
+}
