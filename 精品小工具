@@ -1,3 +1,4 @@
+//按小时划分每段的时长（秒）
 public static function getDjDuration($halldj)
 {
     if(empty($halldj)) return false;
