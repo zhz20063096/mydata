@@ -1,0 +1,45 @@
+// appkey & secret code
+var secretCode = '60DNCNLLf';//更改成自己的签名密钥
+var timestamp = parseInt( (new Date()).getTime() / 1000 ); // 秒
+
+//根据是否存在data_version参数，来设置data_version的值
+if(request.data.hasOwnProperty('data_version')){
+    pm.environment.set("data_version", timestamp);
+    request.data["data_version"] = timestamp;
+}
+
+// 设置全局请求域名地址，和项目上下文路径
+//pm.environment.set("URL", "http://127.0.0.1:8080/ecoupon-redemption-system");
+pm.environment.set("timestamp", timestamp);
+
+//console.log("全部请求参数：" + request.data["data_version"]);
+request.data["timestamp"] = timestamp;
+var keys = Object.keys(request.data).sort() //请求参数名按照ASCII码升序排序
+
+//拼接待签名字符串
+var str = []
+for (var p = 0; p < keys.length; p++) { 
+    if(keys[p] == "sign" || keys[p] == "signmethod" || request.data[keys[p]] === ""){ 
+        // "==" ==宽松相等，隐性类型转换，值相等，返回true; 
+        // "===" 严格相等，值和类型都相等，返回true
+        continue;
+    }
+    str.push(keys[p] + "=" + request.data[keys[p]]);
+}
+var signStr = secretCode + str.join("&");//根据自己实际情况，调节密钥和str的先后次序
+console.log("待加密字符串 signStr == " + signStr);
+
+//MD5加密签名规格，并赋值给环境变量`sign`
+pm.environment.unset("sign");
+var sign = CryptoJS.MD5(signStr).toString();
+console.log("计算出的签名 sign == " + sign);
+pm.environment.set("sign", sign);
+
+
+另外：
+在postman参数列表中增加下面参数配置
+data_version:{{data_version}} //可选
+timestamp:{{timestamp}} //必选
+sign:{{sign}} //必选
+
+另外：
