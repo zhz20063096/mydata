@@ -189,6 +189,7 @@ ERROR 1205 (HY000): Lock wait timeout exceeded; try restarting transaction
 　　 4、隔离级别越高，越能保证数据的完整性和一致性，但是对并发性能的影响也越大。
 
 　　 5、MYSQL MVCC实现机制参考链接：https://blog.csdn.net/whoamiyang/article/details/51901888
+            https://www.cnblogs.com/jelly12345/p/14889331.html
 
 　　 6、关于next-key 锁可以参考链接：https://blog.csdn.net/bigtree_3721/article/details/73731377
 
